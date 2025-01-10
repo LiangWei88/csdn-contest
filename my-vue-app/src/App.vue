@@ -33,10 +33,14 @@ const sendMessage = async () => {
     inputMessage.value = '';
 
     try {
-      const reply = await chatApi.fetchChatCompletions([{ role: 'user', content: userMessage.content }]);
-      console.log('ChatApi:', reply);
-      
-      messages.value.push({ type: 'bot', content: reply.delta.content, id: Date.now() });
+      const botMessage = { type: 'bot', content: '', id: Date.now() };
+      messages.value.push(botMessage);
+
+      const stream = await chatApi.fetchChatCompletions([{ role: 'user', content: userMessage.content }]);
+      for await (const chunk of stream) {
+        botMessage.content += chunk;
+        messages.value = [...messages.value]; // 触发响应式更新
+      }
     } catch (error) {
       console.error('Error:', error);
       messages.value.push({ type: 'bot', content: '抱歉，我暂时无法回复。', id: Date.now() });

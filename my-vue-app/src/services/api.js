@@ -24,43 +24,35 @@ export default class ChatApi {
     return this.handleStream(response.body);
   }
 
-  async handleStream(stream) {
+  async *handleStream(stream) { // 使用 async * 定义 generator 函数
     const reader = stream.getReader();
     const decoder = new TextDecoder();
-    let dataText = '';
+    let buffer = '';
 
-    return new Promise((resolve, reject) => {
-      reader.read().then(function processText({ done, value }) {
-        if (done) {
-          resolve();
-          return;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // 保留未完成的行
+
+      for (const line of lines) {
+        if (line.trim() === '') continue;
+        if (line === 'data: [DONE]') break;
+
+        const json = line.replace(/^data: /, '');
+        const data = JSON.parse(json);
+        const content = data.choices[0].delta.content;
+
+        if (content) {
+          yield content; // 使用 yield 逐步返回内容
         }
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.toString().split(/\r?\n/);
-        lines.forEach(line => {
-          if (line) {
-            dataText += line;
-            const response = line.slice(6);
-            if (response === '[DONE]') {
-              return;
-            }
-            const choices = JSON.parse(response.trim())?.choices?.[0];
-            if (choices) {
-              if (choices.finish_reason === 'stop') {
-                return;
-              }
-              resolve(choices); // 返回选择的回复
-            }
-          }
-        });
-        reader.read().then(processText);
-      }).catch(reject);
-    });
+      }
+    }
   }
 
   cancelRequest() {
     this.controller.abort();
   }
 }
-
