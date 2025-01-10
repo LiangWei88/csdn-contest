@@ -1,68 +1,56 @@
-<!-- src/App.vue -->
 <template>
-  <div class="chat-container">
-    <div class="chat-box">
-      <!-- 聊天记录 -->
-      <div v-for="(message, index) in messages" :key="index" class="message">
-        <span>{{ message }}</span>
-      </div>
-    </div>
-    <div class="input-box">
-      <t-input v-model="inputMessage" placeholder="输入消息..." @keyup.enter="sendMessage" />
-      <t-button @click="sendMessage">发送</t-button>
-    </div>
-  </div>
+  <t-chat>
+    <t-chat-item
+      v-for="(message, index) in messages"
+      :key="message.id"
+      :datetime="new Date(message.id).toLocaleTimeString()"
+      avatar="https://tdesign.gtimg.com/site/avatar.jpg"
+      :name="message.type === 'user' ? 'user' : 'bot'"
+      role="message.type"
+      :content="message.content"
+      variant="text"
+    />
+    <t-chat-input
+      v-model="inputMessage"
+      placeholder="输入消息..."
+      @send="sendMessage"
+    />
+  </t-chat>
 </template>
 
-<script>
-export default {
-  data() {
-    return {
-      messages: [],
-      inputMessage: ''
-    }
-  },
-  methods: {
-    sendMessage() {
-      if (this.inputMessage.trim()) {
-        this.messages.push(this.inputMessage)
-        this.inputMessage = ''
-      }
+<script setup>
+import { ref } from 'vue';
+import ChatApi from './services/api'; // 导入 ChatApi 类
+
+const messages = ref([]);
+const inputMessage = ref('');
+const chatApi = new ChatApi('sk-6R0hq8U7v3bSbT1u41Lp6kPRwAgf9wnW73WgvSC7WUI73eRO'); // 创建 ChatApi 实例，替换为你的API密钥
+
+const sendMessage = async () => {
+  if (inputMessage.value.trim()) {
+    const userMessage = { type: 'user', content: inputMessage.value, id: Date.now() };
+    messages.value.push(userMessage);
+    inputMessage.value = '';
+
+    try {
+      const reply = await chatApi.fetchChatCompletions([{ role: 'user', content: userMessage.content }]);
+      console.log('ChatApi:', reply);
+      
+      messages.value.push({ type: 'bot', content: reply.delta.content, id: Date.now() });
+    } catch (error) {
+      console.error('Error:', error);
+      messages.value.push({ type: 'bot', content: '抱歉，我暂时无法回复。', id: Date.now() });
     }
   }
-}
+};
 </script>
 
 <style scoped>
 .chat-container {
-  display: flex;
-  flex-direction: column;
   height: 100vh;
 }
 
-.chat-box {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px;
+.t-chat {
+  height: 100%;
 }
-
-.input-box {
-  display: flex;
-  padding: 10px;
-  border-top: 1px solid #ccc;
-}
-
-.message {
-  margin: 5px 0;
-  }
-  
-  @media (max-width: 600px) {
-    .input-box {
-      flex-direction: column;
-    }
-  
-    .input-box>* {
-      margin-bottom: 10px;
-    }
-  }
 </style>
